@@ -1,0 +1,52 @@
+#!/bin/sh
+
+#
+# Copyright (C) 2022 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-2.0-only
+#
+
+function usage {
+    echo "$0 <exported_archive>"
+    exit 1
+}
+
+if [ -z "$1" ]; then
+    usage    
+fi
+
+if [ ! -f $1 ]; then
+    echo "No such file or directory: '$1'"
+    exit 1
+fi
+
+# Prepare target directories and explode archive
+tmp_dir=$(mktemp -d)
+work_dir=$(pwd)
+
+# Find absolute path of the archive
+archive=$(cd "$(dirname -- "$1")" >/dev/null; pwd -P)/$(basename -- "$1")
+
+# Explode the archive
+cd $tmp_dir
+tar xzf "$archive"
+cd $work_dir
+
+# Execute all scripts
+for f in $(find /usr/share/ns-migration/ -type f)
+do
+    if [ -x "$f" ]; then
+        "$f" "$tmp_dir/export"
+    fi
+done
+
+rm -rf $tmp_dir
+
+# Restart services
+service network restart
+service firewall restart
+service dnsmasq restart
+service dropbear restart
+service system restart
+service cron restart
+service sysntpd restart
+service ns-plug restart
